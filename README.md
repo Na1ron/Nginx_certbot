@@ -194,4 +194,117 @@ root@prodavec:/etc/nginx# tail -f /var/log/nginx/access.log
 
 ``  return 301 https://host$request_uri; ``
 
+### 10. Автообновление сертификатов настроил с помощью systemd-юнита и таймера для него
 
+```
+root@prodavec:/etc/systemd/system# ll
+total 64
+drwxr-xr-x 14 root root 4096 Mar  2 00:24  ./
+drwxr-xr-x  5 root root 4096 Feb 25 13:20  ../
+-rw-r--r--  1 root root  140 Mar  2 00:24  certbot-semi-automatic.service
+-rw-r--r--  1 root root  125 Mar  2 00:24  certbot-semi-automatic.timer
+```
+
+Содержимое юнита для обновления сертификата:
+
+```
+root@prodavec:/etc/systemd/system# cat certbot-semi-automatic.service
+[Unit]
+Description=Certbot Renewal
+
+[Service]
+ExecStart=/usr/bin/certbot renew --force-renewal --post-hook "systemctl reload nginx.service"
+```
+
+Содержимое юнита с таймером:
+
+```
+root@prodavec:/etc/systemd/system# cat certbot-semi-automatic.timer
+[Unit]
+Description=Timer for Certbot Renewal
+
+[Timer]
+OnBootSec=300
+OnUnitActiveSec=1w
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Не смог выполнить обновление сертификатов в ручную через renew , получил такую ошибку:
+
+*certbot renew --allow-subset-of-names -d prodavec.uberlegenheit.ru*
+
+```
+Currently, the renew verb is capable of either renewing all installed certificates that are due to be renewed or renewing a single certificate specified by its name. If you would like to renew specific certificates by their domains, use the certonly command instead. The renew verb may provide other options for selecting certificates to renew in the future.
+Ask for help or search for solutions at https://community.letsencrypt.org. See the logfile /var/log/letsencrypt/letsencrypt.log or re-run Certbot with -v for more details.
+```
+
+Погуглил проблему и понял, что renew обновляет все серификаты, и не может обновить сертификат для конкретного домена
+
+Выполнил certbot renew , сертификаты обновились :
+
+```
+root@prodavec:/etc/letsencrypt# certbot renew
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Processing /etc/letsencrypt/renewal/prodavec.uberlegenheit.ru.conf
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Certificate not yet due for renewal
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+The following certificates are not due for renewal yet:
+  /etc/letsencrypt/live/prodavec.uberlegenheit.ru/fullchain.pem expires on 2024-05-30 (skipped)
+No renewals were attempted.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+```
+
+
+**Обновить отдельно сертификат для отдельного домена можно с помощью:**
+
+`` certbot certonly --webroot -w /var/www/html -d prodavec.uberlegenheit.ru  ``
+
+Попытался обновить серт с помощью sudo certbot certonly --webroot -w /var/www/html -d prodavec.uberlegenheit.ru
+
+Но он не обновился, т.к. по мнению сертбота ещё слишком рано для обновления (так серты действуют 90дн) :
+
+```
+root@prodavec:/etc/letsencrypt# sudo certbot certonly --webroot -w /var/www/html -d prodavec.uberlegenheit.ru
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Certificate not yet due for renewal
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Certificate not yet due for renewal; no action taken.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+```
+Проверку сколько ещё будет действовать серт можно сделать так:
+
+```
+root@prodavec:/etc/letsencrypt# certbot certificates
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Found the following certs:
+  Certificate Name: prodavec.uberlegenheit.ru
+    Serial Number: 49b1c06dbc456c929f5e6863dc90aa96f3f
+    Key Type: RSA
+    Domains: prodavec.uberlegenheit.ru
+    Expiry Date: 2024-05-30 22:37:07+00:00 (VALID: 87 days)
+    Certificate Path: /etc/letsencrypt/live/prodavec.uberlegenheit.ru/fullchain.pem
+    Private Key Path: /etc/letsencrypt/live/prodavec.uberlegenheit.ru/privkey.pem
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+```
+### Выполнил принудительное обновление серта в ручную с помощью ключа --force-renewal , всё обновилось:
+
+```
+root@prodavec:/etc/letsencrypt# sudo certbot certonly --webroot -w /var/www/html -d prodavec.uberlegenheit.ru --force-renewal
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Renewing an existing certificate for prodavec.uberlegenheit.ru
+
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/prodavec.uberlegenheit.ru/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/prodavec.uberlegenheit.ru/privkey.pem
+This certificate expires on 2024-06-01.
+These files will be updated when the certificate renews.
+```
