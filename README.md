@@ -66,3 +66,89 @@ sait ymer, idite k adminy
 root@prodavec:/var/www/html# pwd
 /var/www/html
 ```
+### 4. Выполнил curl -ILk 10.182.10.160 и curl без ключей:
+
+```
+root@prodavec:/var/www/html# curl -ILk 10.182.10.160
+HTTP/1.1 301 Moved Permanently
+Server: nginx/1.18.0 (Ubuntu)
+Date: Sun, 03 Mar 2024 22:41:45 GMT
+Content-Type: text/html
+Content-Length: 178
+Connection: keep-alive
+Location: https://host/
+
+curl: (6) Could not resolve host: host
+```
+
+```
+root@prodavec:/var/www/html# curl 10.182.10.160
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body>
+<center><h1>301 Moved Permanently</h1></center>
+<hr><center>nginx/1.18.0 (Ubuntu)</center>
+</body>
+</html>
+```
+Не отображается hello world через консоль, т.к. идёт редирект на https (который уже определил в confige
+
+### 5. Поддомен получен - prodavec.uberlegenheit.ru и описан в конфиге, всё работает
+
+```
+root@prodavec:/var/www/html# curl prodavec.uberlegenheit.ru
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body>
+<center><h1>301 Moved Permanently</h1></center>
+<hr><center>nginx/1.18.0 (Ubuntu)</center>
+</body>
+</html>
+```
+### 6. Директивы для доступа по https добавлены в конфиг virtual host'a:
+
+```
+server {
+    listen 443 ssl;
+    server_name prodavec.uberlegenheit.ru www.prodavec.uberlegenheit.ru;
+
+    ssl_certificate /etc/letsencrypt/live/prodavec.uberlegenheit.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/prodavec.uberlegenheit.ru/privkey.pem;
+```
+### 7. Получил сертификаты с помощью certbot --nginx -d prodavec.uberlegenheit.ru:
+
+```
+root@prodavec:/etc/letsencrypt# certbot --nginx -d prodavec.uberlegenheit.ru
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Certificate not yet due for renewal
+Deploying certificate
+Successfully deployed certificate for prodavec.uberlegenheit.ru to /etc/nginx/sites-enabled/prodavec
+Congratulations! You have successfully enabled HTTPS on https://prodavec.uberlegenheit.ru
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+If you like Certbot, please consider supporting our work by:
+ * Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+ * Donating to EFF:                    https://eff.org/donate-le
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+```
+
+**Перед этим создал cli.ini в etc/letsencrypt с содержанием:***
+
+```
+email = jcatswill@gmail.com
+agree-tos = True
+non-interactive = True
+preferred-challenges = http
+```
+**email = jcatswill@gmail.com** указал свою почту, похуй, пусть летят спам-письма от letsencrypt'a
+
+**agree-tos = True:** Это означает, что пользователь согласен с условиями использования и политикой конфиденциальности Certbot.
+
+**non-interactive = True:** Это указывает, что процесс получения сертификата должен происходить автоматически, без взаимодействия с пользователем.
+
+**preferred-challenges = http:** Здесь указывается тип проверки, который будет использоваться для получения сертификата. В данном случае указан HTTP-протокол.
+
+### 8. Проверил работу сайта в браузере, всё равботает c http на https редиректит:
+
+![Logotype](./work.png)
+
