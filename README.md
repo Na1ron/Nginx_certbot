@@ -152,3 +152,46 @@ preferred-challenges = http
 
 ![Logotype](./work.png)
 
+**В связи с тем, что при просмотре access-логов не выдавался  реальный ip-шник реального посетителя сайта, скорректировал log format,**
+
+в /etc/nginx/nginx.conf определил новый log fotmat:
+
+```
+        log_format myformat '$http_x_real_ip $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" ';
+
+        error_log /var/log/nginx/error.log;
+```
+
+**Далее добавил этот формат (myformat) в свой virtual host /etc/nginx/sites-available/prodavec :**
+
+```
+    root /var/www/html;
+    index index.html index.htm index.nginx-debian.html;
+    access_log /var/log/nginx/access.log myformat;
+```
+
+Теперь при просмотрел логов (через tail -f /var/log/nginx/access.log) показывается реальные ip пользователей открывающих мой сайтец:
+
+```
+root@prodavec:/etc/nginx# tail -f /var/log/nginx/access.log
+109.194.102.169 - [03/Mar/2024:22:38:21 +0000] "GET / HTTP/1.0" 304 0 "-"
+109.194.102.169 - [03/Mar/2024:22:38:22 +0000] "GET / HTTP/1.0" 304 0 "-"
+127.0.0.1 - - [03/Mar/2024:22:41:30 +0000] "HEAD / HTTP/1.1" 301 0 "-" "curl/7.81.0"
+10.182.10.160 - - [03/Mar/2024:22:41:45 +0000] "HEAD / HTTP/1.1" 301 0 "-" "curl/7.81.0"
+10.182.10.160 - - [03/Mar/2024:22:43:16 +0000] "GET / HTTP/1.1" 301 178 "-" "curl/7.81.0"
+10.182.10.160 - - [03/Mar/2024:22:43:40 +0000] "GET / HTTP/1.1" 301 178 "-" "curl/7.81.0"
+10.182.10.160 - - [03/Mar/2024:22:43:48 +0000] "GET / HTTP/1.1" 301 178 "-" "curl/7.81.0"
+10.182.10.160 - - [03/Mar/2024:22:44:00 +0000] "GET / HTTP/1.1" 301 178 "-" "curl/7.81.0"
+10.182.10.1 - - [03/Mar/2024:22:46:07 +0000] "GET / HTTP/1.0" 301 178 "-" "curl/7.81.0"
+109.194.102.169 - [03/Mar/2024:22:47:22 +0000] "GET /favicon.ico HTTP/1.0" 404 26 "https://prodavec.uberlegenheit.ru/"
+109.194.102.169 - [03/Mar/2024:23:04:06 +0000] "GET / HTTP/1.0" 200 12 "-"
+109.194.102.169 - [03/Mar/2024:23:04:06 +0000] "GET / HTTP/1.0" 304 0 "-"
+
+```
+
+### 9. Редирект трафика с http на https был настроен с помощью корректировок в virtual host:
+
+``  return 301 https://host$request_uri; ``
+
+
